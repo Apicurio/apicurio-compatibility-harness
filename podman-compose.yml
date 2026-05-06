@@ -46,7 +46,7 @@ services:
       start_period: 30s
 
   apicurio-sr:
-    image: quay.io/apicurio/apicurio-registry-kafkasql:2.6.13.Final
+    image: quay.io/apicurio/apicurio-registry:latest-snapshot
     container_name: compat-apicurio-sr
     depends_on:
       kafka:
@@ -54,8 +54,11 @@ services:
     ports:
       - "8082:8080"
     environment:
-      KAFKA_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
-      REGISTRY_LOG_LEVEL: INFO
+      APICURIO_STORAGE_KIND: kafkasql
+      APICURIO_KAFKASQL_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
+      APICURIO_REST_DELETION_GROUP_ENABLED: "true"
+      APICURIO_REST_DELETION_ARTIFACT_ENABLED: "true"
+      APICURIO_REST_DELETION_ARTIFACTVERSION_ENABLED: "true"
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8080/apis/registry/v2/health || exit 1"]
       interval: 10s
