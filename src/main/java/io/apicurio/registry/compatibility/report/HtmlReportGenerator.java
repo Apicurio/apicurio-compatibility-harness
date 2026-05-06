@@ -344,8 +344,8 @@ public class HtmlReportGenerator {
             sb.append("confluentStatus:\"").append(escapeJs(o.getConfluentStatus())).append("\", ");
             sb.append("apicurioStatus:\"").append(escapeJs(o.getApicurioStatus())).append("\", ");
             sb.append("details:\"").append(escapeJs(o.getDetails())).append("\", ");
-            sb.append("confluentBody:").append(toJsString(o.getConfluentBody())).append(", ");
-            sb.append("apicurioBody:").append(toJsString(o.getApicurioBody())).append(", ");
+            sb.append("confluentBody:").append(toJsString(prettifyJson(o.getConfluentBody()))).append(", ");
+            sb.append("apicurioBody:").append(toJsString(prettifyJson(o.getApicurioBody()))).append(", ");
             sb.append("testClassName:\"").append(escapeJs(o.getTestClassName())).append("\", ");
             sb.append("testMethodName:\"").append(escapeJs(o.getTestMethodName())).append("\", ");
             sb.append("testSourceCode:").append(toJsString(o.getTestSourceCode())).append(", ");
