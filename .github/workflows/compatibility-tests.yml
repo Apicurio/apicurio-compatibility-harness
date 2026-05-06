@@ -1,0 +1,52 @@
+name: Compatibility Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  compatibility:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Install podman-compose
+        run: pip3 install podman-compose==1.2.0
+
+      - name: Start test infrastructure
+        run: podman-compose up -d
+        timeout-minutes: 10
+
+      - name: Wait for registries
+        run: ./wait-for-ready.sh 180
+        timeout-minutes: 5
+
+      - name: Run compatibility tests
+        run: mvn clean test -B
+        timeout-minutes: 15
+
+      - name: Collect container logs
+        if: always()
+        run: podman-compose logs || true
+
+      - name: Upload compatibility report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compatibility-report
+          path: target/compatibility-report.html
+          retention-days: 30
+
+      - name: Tear down infrastructure
+        if: always()
+        run: podman-compose down -v || true
