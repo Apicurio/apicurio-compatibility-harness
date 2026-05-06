@@ -4,37 +4,46 @@ import java.io.IOException;
 import java.nio.file.Path;
 
 import org.junit.jupiter.api.extension.AfterAllCallback;
+import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 
 import io.apicurio.registry.compatibility.collector.TestResultCollector;
 import io.apicurio.registry.compatibility.report.HtmlReportGenerator;
+import io.apicurio.registry.compatibility.report.ReportContextEnricher;
 
 /**
  * JUnit 5 extension that generates the HTML compatibility report after all tests complete.
- * Uses a shared {@link ExtensionContext.Store} to ensure the report is written only once
- * even though every test class registers this extension.
+ * Uses a JVM shutdown hook to defer report generation until every test class has finished,
+ * since {@code afterAll()} fires per-class and we can't control class execution order.
  */
-public class CompatibilityReportExtension implements AfterAllCallback {
+public class CompatibilityReportExtension implements BeforeAllCallback, AfterAllCallback {
 
     private static final String REPORT_PATH = "target/compatibility-report.html";
+    private static final String KEY = "report-hook-registered";
 
     @Override
-    public void afterAll(ExtensionContext context) throws Exception {
+    public void beforeAll(ExtensionContext context) {
         ExtensionContext.Store rootStore = context.getRoot().getStore(ExtensionContext.Namespace.GLOBAL);
-        rootStore.getOrComputeIfAbsent("report-generated", k -> {
-            generateReport();
+        rootStore.getOrComputeIfAbsent(KEY, k -> {
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                try {
+                    TestResultCollector collector = TestResultCollector.getInstance();
+                    ReportContextEnricher enricher = new ReportContextEnricher();
+                    enricher.enrich(collector.getOutcomesForEnrichment());
+                    HtmlReportGenerator generator = new HtmlReportGenerator(collector);
+                    generator.generate(Path.of(REPORT_PATH));
+                    System.out.println("Compatibility report written to " + REPORT_PATH
+                            + " (" + collector.getTotalCount() + " results)");
+                } catch (IOException e) {
+                    System.err.println("Failed to generate compatibility report: " + e.getMessage());
+                }
+            }));
             return "done";
         });
     }
 
-    private void generateReport() {
-        try {
-            TestResultCollector collector = TestResultCollector.getInstance();
-            HtmlReportGenerator generator = new HtmlReportGenerator(collector);
-            generator.generate(Path.of(REPORT_PATH));
-            System.out.println("Compatibility report written to " + REPORT_PATH);
-        } catch (IOException e) {
-            System.err.println("Failed to generate compatibility report: " + e.getMessage());
-        }
+    @Override
+    public void afterAll(ExtensionContext context) {
+        // Report generation deferred to shutdown hook registered in beforeAll
     }
 }

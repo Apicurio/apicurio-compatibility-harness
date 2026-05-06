@@ -29,6 +29,10 @@ public class TestResultCollector {
         return Collections.unmodifiableList(new ArrayList<>(outcomes));
     }
 
+    public List<TestOutcome> getOutcomesForEnrichment() {
+        return outcomes;
+    }
+
     public long getPassCount() {
         return count(CompatibilityTestResult.PASS);
     }
