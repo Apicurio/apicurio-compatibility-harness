@@ -29,6 +29,6 @@ check_url() {
 }
 
 check_url "Confluent-SR" "${CONFLUENT_URL}/subjects"
-check_url "Apicurio-SR"  "${APICURIO_URL}/apis/registry/v2/health"
+check_url "Apicurio-SR"  "${APICURIO_URL}/health/live"
 
 echo "All registries are ready."

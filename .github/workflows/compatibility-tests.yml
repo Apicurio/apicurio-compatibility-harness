@@ -27,10 +27,12 @@ jobs:
       - name: Start test infrastructure
         run: |
           podman-compose up -d
-          sleep 3
-          if podman-compose ps --format '{{.Name}} {{.State}}' | grep -qv 'running'; then
-            echo "::error::Some containers failed to start"
-            podman-compose ps --format '{{.Name}} {{.State}}'
+          sleep 5
+          podman ps --format '{{.Names}} {{.Status}}'
+          RUNNING=$(podman ps --filter 'status=running' --format '{{.Names}}' | wc -l)
+          if [ "$RUNNING" -lt 3 ]; then
+            echo "::error::Expected 3 running containers, found $RUNNING"
+            podman ps -a
             exit 1
           fi
         timeout-minutes: 10
