@@ -103,7 +103,8 @@ public abstract class AbstractCompatibilityTest {
                     + ", Apicurio: " + truncate(apicurioResp.asString(), 200);
         }
 
-        recordOutcome(testName, method, endpoint, confluentStatus, apicurioStatus, result, details);
+        recordOutcome(testName, method, endpoint, confluentStatus, apicurioStatus, result, details,
+                confluentResp.asString(), apicurioResp.asString());
     }
 
     protected void assertErrorParity(String testName, Response confluent, Response apicurio,
@@ -129,12 +130,14 @@ public abstract class AbstractCompatibilityTest {
 
         recordOutcome(testName, "VARIES", "error-code-parity",
                 String.valueOf(confluent.statusCode()), String.valueOf(apicurio.statusCode()),
-                result, details);
+                result, details, confluent.asString(), apicurio.asString());
     }
 
     private void recordOutcome(String testName, String method, String endpoint,
             String confluentStatus, String apicurioStatus,
-            CompatibilityTestResult result, String details) {
+            CompatibilityTestResult result, String details,
+            String confluentBody, String apicurioBody) {
+        String[] classAndMethod = inferTestClassAndMethod();
         TestResultCollector.getInstance().record(TestOutcome.builder()
                 .testName(testName)
                 .endpoint(endpoint)
@@ -143,7 +146,22 @@ public abstract class AbstractCompatibilityTest {
                 .confluentStatus(confluentStatus)
                 .apicurioStatus(apicurioStatus)
                 .details(details)
+                .confluentBody(confluentBody)
+                .apicurioBody(apicurioBody)
+                .testClassName(classAndMethod[0])
+                .testMethodName(classAndMethod[1])
                 .build());
+    }
+
+    private String[] inferTestClassAndMethod() {
+        StackTraceElement[] stack = Thread.currentThread().getStackTrace();
+        for (StackTraceElement frame : stack) {
+            String cls = frame.getClassName();
+            if (cls.startsWith("io.apicurio.registry.compatibility.") && !cls.endsWith("AbstractCompatibilityTest")) {
+                return new String[] { cls, frame.getMethodName() };
+            }
+        }
+        return new String[] { null, null };
     }
 
     private boolean responsesSemanticallyMatch(Response confluentResp, Response apicurioResp) {
