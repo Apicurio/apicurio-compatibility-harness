@@ -46,7 +46,7 @@ services:
       start_period: 30s
 
   apicurio-sr:
-    image: quay.io/apicurio/apicurio-registry-kafkasql:latest-snapshot
+    image: quay.io/apicurio/apicurio-registry-kafkasql:2.6.13.Final
     container_name: compat-apicurio-sr
     depends_on:
       kafka:
