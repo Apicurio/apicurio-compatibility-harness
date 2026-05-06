@@ -277,8 +277,8 @@ public class HtmlReportGenerator {
 
     private void appendToolbar(StringBuilder sb) {
         sb.append("    <div class=\"toolbar\">\n");
-        sb.append("        <button onclick=\"openAllDrawers()\">Expand All</button>\n");
-        sb.append("        <button onclick=\"closeDrawer()\">Collapse All</button>\n");
+        sb.append("        <button onclick=\"openAllDrawers()\">Open First</button>\n");
+        sb.append("        <button onclick=\"closeDrawer()\">Close Drawer</button>\n");
         sb.append("        <button onclick=\"filterResults(null)\" class=\"active\" id=\"filter-all\">All</button>\n");
         sb.append("        <button onclick=\"filterResults('PASS')\" id=\"filter-PASS\">Pass</button>\n");
         sb.append("        <button onclick=\"filterResults('FAIL')\" id=\"filter-FAIL\">Fail</button>\n");
@@ -515,7 +515,17 @@ public class HtmlReportGenerator {
         sb.append("        }\n");
 
         // Docs tab
-        sb.append("        document.getElementById('docsDescription').textContent = d.openApiOperation || 'No description available.';\n");
+        sb.append("        var docsDesc = document.getElementById('docsDescription');\n");
+        sb.append("        if (d.openApiOperation && d.openApiOperation.trim()) {\n");
+        sb.append("            try {\n");
+        sb.append("                var spec = JSON.parse(d.openApiOperation);\n");
+        sb.append("                docsDesc.textContent = spec.summary || d.openApiOperation;\n");
+        sb.append("            } catch(e) {\n");
+        sb.append("                docsDesc.textContent = d.openApiOperation;\n");
+        sb.append("            }\n");
+        sb.append("        } else {\n");
+        sb.append("            docsDesc.textContent = 'No description available.';\n");
+        sb.append("        }\n");
         sb.append("        var docsLink = document.getElementById('docsLink');\n");
         sb.append("        if (d.confluentDocUrl) {\n");
         sb.append("            docsLink.href = d.confluentDocUrl;\n");
@@ -550,6 +560,7 @@ public class HtmlReportGenerator {
         // Show drawer
         sb.append("        document.getElementById('drawer').classList.add('open');\n");
         sb.append("        document.getElementById('drawerOverlay').classList.add('visible');\n");
+        sb.append("        document.removeEventListener('keydown', _escHandler);\n");
         sb.append("        document.addEventListener('keydown', _escHandler);\n");
         sb.append("    }\n\n");
 
@@ -706,6 +717,7 @@ public class HtmlReportGenerator {
                 .replace("'", "\\'")
                 .replace("\n", "\\n")
                 .replace("\r", "\\r")
-                .replace("\t", "\\t");
+                .replace("\t", "\\t")
+                .replace("</", "<\\/");
     }
 }
