@@ -63,16 +63,12 @@ jobs:
         if: always()
         run: podman-compose down -v || true
 
-  deploy-pages:
+  publish-report:
     needs: compatibility
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      issues: write
     steps:
       - name: Download compatibility report
         uses: actions/download-artifact@v4
@@ -80,14 +76,89 @@ jobs:
           name: compatibility-report
           path: report-output
 
-      - name: Rename to index.html
-        run: mv report-output/compatibility-report.html report-output/index.html
+      - name: Extract report summary
+        id: summary
+        run: |
+          REPORT="report-output/compatibility-report.html"
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: report-output
+          # Extract counts from summary cards
+          TOTAL=$(grep -oP 'Total.*?<div class="number[^"]*">\K[0-9]+' "$REPORT" | head -1 || echo "?")
+          PASS=$(grep -oP 'Pass.*?<div class="number pass[^"]*">\K[0-9]+' "$REPORT" | head -1 || echo "?")
+          FAIL=$(grep -oP 'Fail.*?<div class="number fail[^"]*">\K[0-9]+' "$REPORT" | head -1 || echo "?")
+          SKIP=$(grep -oP 'Skipped.*?<div class="number skipped[^"]*">\K[0-9]+' "$REPORT" | head -1 || echo "?")
+          KNOWN=$(grep -oP 'Known Incompat\..*?<div class="number known[^"]*">\K[0-9]+' "$REPORT" | head -1 || echo "?")
+          ERR=$(grep -oP 'Error.*?<div class="number error[^"]*">\K[0-9]+' "$REPORT" | head -1 || echo "?")
+          VERSION=$(grep -oP 'Confluent Schema Registry: v\K[0-9.]+' "$REPORT" | head -1 || echo "unknown")
 
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
+          echo "pass=$PASS" >> "$GITHUB_OUTPUT"
+          echo "fail=$FAIL" >> "$GITHUB_OUTPUT"
+          echo "skip=$SKIP" >> "$GITHUB_OUTPUT"
+          echo "known=$KNOWN" >> "$GITHUB_OUTPUT"
+          echo "error=$ERR" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+          if [ "$FAIL" = "0" ] && [ "$ERR" = "0" ]; then
+            echo "status=passed" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=failed" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Find or create report issue
+        id: issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Look for the pinned report issue
+          ISSUE_NUMBER=$(gh issue list --state open --search "Compatibility Test Report Dashboard" --json number --jq '.[0].number' || true)
+
+          if [ -z "$ISSUE_NUMBER" ]; then
+            ISSUE_NUMBER=$(gh issue create \
+              --title "Compatibility Test Report Dashboard" \
+              --body "Latest compatibility test results are posted as comments below. The full HTML report is available as a [workflow artifact](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})." \
+              --jq '.number')
+          fi
+
+          echo "number=$ISSUE_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Post report summary
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          STATUS="${{ steps.summary.outputs.status }}"
+          VERSION="${{ steps.summary.outputs.version }}"
+          TOTAL="${{ steps.summary.outputs.total }}"
+          PASS="${{ steps.summary.outputs.pass }}"
+          FAIL="${{ steps.summary.outputs.fail }}"
+          SKIP="${{ steps.summary.outputs.skip }}"
+          KNOWN="${{ steps.summary.outputs.known }}"
+          ERR="${{ steps.summary.outputs.error }}"
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          RUN_DATE=$(date -u '+%Y-%m-%d %H:%M UTC')
+
+          if [ "$STATUS" = "passed" ]; then
+            ICON=":white_check_mark:"
+          else
+            ICON=":x:"
+          fi
+
+          gh issue comment "${{ steps.issue.outputs.number }}" --body "$(cat <<BODY
+          ## $ICON Compatibility Report — $RUN_DATE
+
+          **Commit:** [\`${SHORT_SHA}\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
+          **Confluent SR:** v${VERSION}
+
+          | | Count |
+          |---|---|
+          | Total | ${TOTAL} |
+          | Pass | ${PASS} |
+          | Fail | ${FAIL} |
+          | Skipped (Known Gaps) | ${SKIP} |
+          | Known Incompatibilities | ${KNOWN} |
+          | Errors | ${ERR} |
+
+          **Full HTML report:** [Download artifact](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) (compatibility-report)
+
+          ---
+          BODY
+          )"
