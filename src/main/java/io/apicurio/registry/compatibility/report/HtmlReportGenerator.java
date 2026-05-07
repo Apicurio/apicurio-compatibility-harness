@@ -15,6 +15,8 @@ import io.apicurio.registry.compatibility.model.TestOutcome;
 public class HtmlReportGenerator {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final String CONFLUENT_VERSION =
+            System.getProperty("confluent.registry.version", "7.8.0");
 
     private final TestResultCollector collector;
 
@@ -47,6 +49,8 @@ public class HtmlReportGenerator {
         sb.append("    <h1>Apicurio Registry - Confluent v8 API Compatibility Report</h1>\n");
         sb.append("    <p class=\"meta\">Generated: ")
                 .append(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
+                .append(" &middot; Confluent Schema Registry: v")
+                .append(escapeHtml(CONFLUENT_VERSION))
                 .append("</p>\n");
 
         // Summary cards

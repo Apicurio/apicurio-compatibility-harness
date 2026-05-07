@@ -1,0 +1,67 @@
+name: Confluent Version Scout
+
+on:
+  schedule:
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+
+jobs:
+  check-version:
+    runs-on: ubuntu-24.04
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for new Confluent Schema Registry version
+        id: version-check
+        run: bash .github/scripts/check-confluent-version.sh podman-compose.yml
+
+      - name: Check for existing open issue
+        if: steps.version-check.outputs.UPDATE_NEEDED == 'true'
+        id: check-issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TITLE="Confluent Schema Registry ${{ steps.version-check.outputs.NEW_VERSION }} available"
+          EXISTING=$(gh issue list --state open --search "$TITLE" --json number --jq '.[0].number' || true)
+          if [ -n "$EXISTING" ]; then
+            echo "Issue already exists: #$EXISTING"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open GitHub Issue
+        if: >-
+          steps.version-check.outputs.UPDATE_NEEDED == 'true'
+          && steps.check-issue.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NEW="${{ steps.version-check.outputs.NEW_VERSION }}"
+          CURRENT="${{ steps.version-check.outputs.PINNED_VERSION }}"
+          gh issue create \
+            --title "Confluent Schema Registry ${NEW} available (currently testing ${CURRENT})" \
+            --body "$(cat <<BODY
+          ## Confluent Schema Registry Version Update Available
+
+          | | Version |
+          |---|---|
+          | **Currently testing** | ${CURRENT} |
+          | **Now available** | ${NEW} |
+
+          ### Action required
+
+          1. Review the [Confluent Platform release notes](https://docs.confluent.io/platform/current/release-notes/index.html) for changes in version ${NEW}.
+          2. Update the image tag in \`podman-compose.yml\` from \`${CURRENT}\` to \`${NEW}\`.
+          3. Run the compatibility tests to verify no regressions.
+
+          ### Files to update
+
+          - \`podman-compose.yml\` -- change \`cp-schema-registry:${CURRENT}\` to \`cp-schema-registry:${NEW}\`
+
+          ---
+          *This issue was automatically created by the [Confluent Version Scout workflow](https://github.com/${{ github.repository }}/actions/workflows/confluent-version-scout.yml).*
+          BODY
+          )"
