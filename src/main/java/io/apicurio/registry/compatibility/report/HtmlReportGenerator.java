@@ -222,10 +222,8 @@ public class HtmlReportGenerator {
         // API Spec tab
         sb.append("        .api-spec-header { font-size: 1.1rem; font-weight: 600;\n");
         sb.append("                           margin-bottom: 0.75rem; }\n");
-        sb.append("        .api-spec-summary { color: #555; font-size: 0.9rem;\n");
-        sb.append("                            line-height: 1.5; }\n");
 
-        // Docs & Impl tabs
+        // Doc sections (API Spec & Impl tabs)
         sb.append("        .doc-section { margin-bottom: 1rem; }\n");
         sb.append("        .doc-section h3 { font-size: 0.95rem; margin-bottom: 0.5rem;\n");
         sb.append("                           color: #37474f; }\n");
@@ -415,9 +413,8 @@ public class HtmlReportGenerator {
         sb.append("        <div class=\"drawer-tabs\">\n");
         sb.append("            <button class=\"tab-btn active\" onclick=\"switchTab('responses')\">Responses</button>\n");
         sb.append("            <button class=\"tab-btn\" onclick=\"switchTab('request')\">Request</button>\n");
-        sb.append("            <button class=\"tab-btn\" onclick=\"switchTab('testcode')\">Test Code</button>\n");
+        sb.append("            <button class=\"tab-btn\" onclick=\"switchTab('testcode')\">Source</button>\n");
         sb.append("            <button class=\"tab-btn\" onclick=\"switchTab('apispec')\">API Spec</button>\n");
-        sb.append("            <button class=\"tab-btn\" onclick=\"switchTab('docs')\">Docs</button>\n");
         sb.append("            <button class=\"tab-btn\" onclick=\"switchTab('impl')\">Impl</button>\n");
         sb.append("        </div>\n");
 
@@ -456,17 +453,12 @@ public class HtmlReportGenerator {
         sb.append("                <pre class=\"code-block\" id=\"codeBlock\"></pre>\n");
         sb.append("            </div>\n");
 
-        // API Spec tab
+        // API Spec tab (combined spec + docs)
         sb.append("            <div class=\"tab-panel\" id=\"panel-apispec\">\n");
         sb.append("                <div class=\"api-spec-header\" id=\"apiSpecHeader\"></div>\n");
-        sb.append("                <div class=\"api-spec-summary\" id=\"apiSpecSummary\"></div>\n");
-        sb.append("            </div>\n");
-
-        // Docs tab
-        sb.append("            <div class=\"tab-panel\" id=\"panel-docs\">\n");
         sb.append("                <div class=\"doc-section\">\n");
-        sb.append("                    <h3>Operation Description</h3>\n");
-        sb.append("                    <p id=\"docsDescription\"></p>\n");
+        sb.append("                    <h3>Description</h3>\n");
+        sb.append("                    <p id=\"apiSpecDescription\"></p>\n");
         sb.append("                </div>\n");
         sb.append("                <div class=\"doc-section\">\n");
         sb.append("                    <h3>Confluent Documentation</h3>\n");
@@ -551,32 +543,19 @@ public class HtmlReportGenerator {
 
         // API Spec tab
         sb.append("        var specHeader = document.getElementById('apiSpecHeader');\n");
-        sb.append("        var specSummary = document.getElementById('apiSpecSummary');\n");
+        sb.append("        var specDesc = document.getElementById('apiSpecDescription');\n");
         sb.append("        if (d.openApiOperation && d.openApiOperation.trim()) {\n");
         sb.append("            try {\n");
         sb.append("                var spec = JSON.parse(d.openApiOperation);\n");
         sb.append("                specHeader.textContent = (spec.method || d.method) + ' ' + (spec.path || d.endpoint);\n");
-        sb.append("                specSummary.textContent = spec.summary || d.endpoint;\n");
+        sb.append("                specDesc.textContent = spec.summary || d.endpoint;\n");
         sb.append("            } catch(e) {\n");
         sb.append("                specHeader.textContent = d.method + ' ' + d.endpoint;\n");
-        sb.append("                specSummary.textContent = d.openApiOperation;\n");
+        sb.append("                specDesc.textContent = d.openApiOperation;\n");
         sb.append("            }\n");
         sb.append("        } else {\n");
         sb.append("            specHeader.textContent = d.method + ' ' + d.endpoint;\n");
-        sb.append("            specSummary.textContent = d.endpoint;\n");
-        sb.append("        }\n");
-
-        // Docs tab
-        sb.append("        var docsDesc = document.getElementById('docsDescription');\n");
-        sb.append("        if (d.openApiOperation && d.openApiOperation.trim()) {\n");
-        sb.append("            try {\n");
-        sb.append("                var spec = JSON.parse(d.openApiOperation);\n");
-        sb.append("                docsDesc.textContent = spec.summary || d.openApiOperation;\n");
-        sb.append("            } catch(e) {\n");
-        sb.append("                docsDesc.textContent = d.openApiOperation;\n");
-        sb.append("            }\n");
-        sb.append("        } else {\n");
-        sb.append("            docsDesc.textContent = 'No description available.';\n");
+        sb.append("            specDesc.textContent = 'No description available.';\n");
         sb.append("        }\n");
         sb.append("        var docsLink = document.getElementById('docsLink');\n");
         sb.append("        if (d.confluentDocUrl) {\n");
