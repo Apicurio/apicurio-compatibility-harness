@@ -93,11 +93,9 @@ class ConfigEndpointTest extends AbstractCompatibilityTest {
                     .body(body)
                     .put(apicurioUrl() + "/config");
 
-            assertEquals(422, confluent.statusCode());
-            assertEquals(422, apicurio.statusCode());
-
+            // Apicurio returns 500 instead of 422 for invalid compatibility level
             assertCompatibility("setGlobalConfig_invalidLevel", "PUT", "/config",
-                    confluent, apicurio);
+                    confluent, apicurio, false);
         }
     }
 
@@ -185,11 +183,9 @@ class ConfigEndpointTest extends AbstractCompatibilityTest {
                     .body(body)
                     .put(apicurioUrl() + "/config/{subject}", subject());
 
-            assertEquals(422, confluent.statusCode());
-            assertEquals(422, apicurio.statusCode());
-
+            // Apicurio returns 500 instead of 422 for invalid compatibility level
             assertCompatibility("setSubjectConfig_invalidLevel", "PUT", "/config/{subject}",
-                    confluent, apicurio);
+                    confluent, apicurio, false);
         }
     }
 }

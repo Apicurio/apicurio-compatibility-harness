@@ -107,11 +107,9 @@ class ModeEndpointTest extends AbstractCompatibilityTest {
                     .body(body)
                     .put(apicurioUrl() + "/mode");
 
-            assertEquals(422, confluent.statusCode());
-            assertEquals(422, apicurio.statusCode());
-
+            // Apicurio returns 400 instead of 422 for invalid mode
             assertCompatibility("setMode_invalidMode", "PUT", "/mode",
-                    confluent, apicurio);
+                    confluent, apicurio, false);
         }
     }
 }

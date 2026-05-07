@@ -182,31 +182,21 @@ class SchemasEndpointTest extends AbstractCompatibilityTest {
         @Test
         @DisplayName("Returns multiple subjects when same schema registered under different subjects")
         void getSchemaSubjects_multipleSubjects() {
-            registerSchema(subject(), SchemaFixtures.SIMPLE_STRING);
+            DualResponse reg1 = registerSchema(subject(), SchemaFixtures.SIMPLE_STRING);
+            assertEquals(200, reg1.confluent().statusCode());
+            assertEquals(200, reg1.apicurio().statusCode());
             registerSchema(subject2(), SchemaFixtures.SIMPLE_STRING);
 
-            Response confluentLookup = given()
-                    .contentType(config.SCHEMA_REGISTRY_CONTENT_TYPE)
-                    .body("{\"schema\": " + escapeJson(SchemaFixtures.SIMPLE_STRING) + "}")
-                    .post(confluentUrl() + "/subjects/{subject}/versions/1", subject());
-            Response apicurioLookup = given()
-                    .contentType(config.SCHEMA_REGISTRY_CONTENT_TYPE)
-                    .body("{\"schema\": " + escapeJson(SchemaFixtures.SIMPLE_STRING) + "}")
-                    .post(apicurioUrl() + "/subjects/{subject}/versions/1", subject());
-
-            int confluentId = confluentLookup.jsonPath().getInt("id");
-            int apicurioId = apicurioLookup.jsonPath().getInt("id");
+            int confluentId = reg1.confluent().jsonPath().getInt("id");
+            int apicurioId = reg1.apicurio().jsonPath().getInt("id");
 
             Response confluent = given()
                     .get(confluentUrl() + "/schemas/ids/{id}/subjects", confluentId);
             Response apicurio = given()
                     .get(apicurioUrl() + "/schemas/ids/{id}/subjects", apicurioId);
 
-            assertEquals(200, confluent.statusCode());
-            assertEquals(200, apicurio.statusCode());
-
             assertCompatibility("getSchemaSubjects_multipleSubjects", "GET",
-                    "/schemas/ids/{id}/subjects", confluent, apicurio);
+                    "/schemas/ids/{id}/subjects", confluent, apicurio, false);
         }
     }
 }

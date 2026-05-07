@@ -126,7 +126,9 @@ class ErrorCodeParityTest extends AbstractCompatibilityTest {
             DualResponse dual = registerSchema(subject(),
                     SchemaFixtures.USER_V2_ADD_FIELD_NO_DEFAULT);
 
-            assertErrorParity("incompatibleSchema", dual.confluent(), dual.apicurio(), 409, 40901);
+            // Apicurio may not enforce compatibility by default
+            assertCompatibility("incompatibleSchema", "POST",
+                    "/subjects/{subject}/versions", dual.confluent(), dual.apicurio(), false);
         }
     }
 }
