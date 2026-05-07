@@ -85,7 +85,7 @@ jobs:
           REPORT="report-output/compatibility-report.html"
 
           # Extract counts from summary cards (HTML structure: <div class="number CLASS">N</div><div class="label">LABEL</div>)
-          TOTAL=$(grep -oP '<div class="number">[0-9]+</div><div class="label">Total' "$REPORT" | grep -oP '>[0-9]+<' | tr -d '><' | head -1 || echo "?")
+          TOTAL=$(grep -oP '<div class="number[ "]*>[0-9]+</div><div class="label">Total' "$REPORT" | grep -oP '>[0-9]+<' | tr -d '><' | head -1 || echo "?")
           PASS=$(grep -oP '<div class="number pass">[0-9]+</div><div class="label">Pass' "$REPORT" | grep -oP '>[0-9]+<' | tr -d '><' | head -1 || echo "?")
           FAIL=$(grep -oP '<div class="number fail">[0-9]+</div><div class="label">Fail' "$REPORT" | grep -oP '>[0-9]+<' | tr -d '><' | head -1 || echo "?")
           SKIP=$(grep -oP '<div class="number skipped">[0-9]+</div><div class="label">Skipped' "$REPORT" | grep -oP '>[0-9]+<' | tr -d '><' | head -1 || echo "?")
