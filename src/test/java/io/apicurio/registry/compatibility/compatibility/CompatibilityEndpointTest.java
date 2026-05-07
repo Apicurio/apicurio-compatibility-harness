@@ -25,7 +25,7 @@ class CompatibilityEndpointTest extends AbstractCompatibilityTest {
     }
 
     private DualResponse checkCompatibility(String subject, int version, String schemaJson) {
-        String body = "{\"schema\": " + escapeJson(schemaJson) + "}";
+        String body = schemaBody(schemaJson);
 
         Response confluentResp = given()
                 .contentType(config.SCHEMA_REGISTRY_CONTENT_TYPE)
@@ -61,7 +61,8 @@ class CompatibilityEndpointTest extends AbstractCompatibilityTest {
 
             assertCompatibility("backwardCompatibleSchema", "POST",
                     "/compatibility/subjects/{subject}/versions/{version}",
-                    compat.confluent(), compat.apicurio());
+                    compat.confluent(), compat.apicurio(),
+                    schemaBody(SchemaFixtures.USER_V2_ADD_FIELD));
         }
 
         @Test
@@ -79,7 +80,8 @@ class CompatibilityEndpointTest extends AbstractCompatibilityTest {
 
             assertCompatibility("addFieldWithoutDefault", "POST",
                     "/compatibility/subjects/{subject}/versions/{version}",
-                    compat.confluent(), compat.apicurio());
+                    compat.confluent(), compat.apicurio(),
+                    schemaBody(SchemaFixtures.USER_V2_ADD_FIELD_NO_DEFAULT));
         }
 
         @Test
@@ -95,7 +97,8 @@ class CompatibilityEndpointTest extends AbstractCompatibilityTest {
             // Apicurio does not validate schema syntax in compatibility checks
             assertCompatibility("invalidSchema", "POST",
                     "/compatibility/subjects/{subject}/versions/{version}",
-                    compat.confluent(), compat.apicurio(), false);
+                    compat.confluent(), compat.apicurio(), false,
+                    schemaBody(SchemaFixtures.INVALID_SCHEMA));
         }
     }
 }

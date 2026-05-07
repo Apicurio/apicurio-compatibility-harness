@@ -206,6 +206,7 @@ public class ReportContextEnricher {
                     .openApiOperation(openApiOperation)
                     .confluentDocUrl(confluentDocUrl)
                     .apicurioImplHint(apicurioImplHint)
+                    .requestPayload(outcome.getRequestPayload())
                     .build();
 
             outcomes.set(i, enriched);

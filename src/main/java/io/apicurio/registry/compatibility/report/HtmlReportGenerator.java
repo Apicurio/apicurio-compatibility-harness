@@ -230,6 +230,14 @@ public class HtmlReportGenerator {
         sb.append("                           border-radius: 4px; font-size: 0.8rem;\n");
         sb.append("                           white-space: pre-wrap; margin-top: 0.5rem; }\n");
 
+        // Request tab
+        sb.append("        .request-field { margin-bottom: 0.75rem; }\n");
+        sb.append("        .request-label { font-weight: 600; color: #37474f; }\n");
+        sb.append("        .request-payload { background: #f5f5f5; padding: 0.75rem; border-radius: 4px;\n");
+        sb.append("                           font-size: 0.8rem; white-space: pre-wrap; margin-top: 0.5rem;\n");
+        sb.append("                           font-family: 'SF Mono', 'Consolas', monospace; }\n");
+        sb.append("        .request-payload.empty { color: #999; font-style: italic; }\n");
+
         // Triage bar
         sb.append("        .triage-bar { position: absolute; bottom: 0; left: 0; right: 0;\n");
         sb.append("                      display: flex; gap: 0.75rem; align-items: center;\n");
@@ -344,6 +352,7 @@ public class HtmlReportGenerator {
             sb.append("testName:\"").append(escapeJs(o.getTestName())).append("\", ");
             sb.append("endpoint:\"").append(escapeJs(o.getEndpoint())).append("\", ");
             sb.append("method:\"").append(escapeJs(o.getMethod())).append("\", ");
+            sb.append("requestPayload:").append(toJsString(prettifyJson(o.getRequestPayload()))).append(", ");
             sb.append("result:\"").append(escapeJs(o.getResult().name())).append("\", ");
             sb.append("confluentStatus:\"").append(escapeJs(o.getConfluentStatus())).append("\", ");
             sb.append("apicurioStatus:\"").append(escapeJs(o.getApicurioStatus())).append("\", ");
@@ -394,6 +403,7 @@ public class HtmlReportGenerator {
         // Tabs
         sb.append("        <div class=\"drawer-tabs\">\n");
         sb.append("            <button class=\"tab-btn active\" onclick=\"switchTab('responses')\">Responses</button>\n");
+        sb.append("            <button class=\"tab-btn\" onclick=\"switchTab('request')\">Request</button>\n");
         sb.append("            <button class=\"tab-btn\" onclick=\"switchTab('testcode')\">Test Code</button>\n");
         sb.append("            <button class=\"tab-btn\" onclick=\"switchTab('apispec')\">API Spec</button>\n");
         sb.append("            <button class=\"tab-btn\" onclick=\"switchTab('docs')\">Docs</button>\n");
@@ -413,6 +423,18 @@ public class HtmlReportGenerator {
         sb.append("                    <div class=\"response-panel\">\n");
         sb.append("                        <div class=\"panel-header\" id=\"apicurioHeader\">Apicurio Response</div>\n");
         sb.append("                        <pre id=\"apicurioBody\"></pre>\n");
+        sb.append("                    </div>\n");
+        sb.append("                </div>\n");
+        sb.append("            </div>\n");
+
+        // Request tab
+        sb.append("            <div class=\"tab-panel\" id=\"panel-request\">\n");
+        sb.append("                <div class=\"doc-section\">\n");
+        sb.append("                    <div class=\"request-field\"><span class=\"request-label\">Method:</span> <span id=\"requestMethod\"></span></div>\n");
+        sb.append("                    <div class=\"request-field\"><span class=\"request-label\">Endpoint:</span> <code id=\"requestEndpoint\"></code></div>\n");
+        sb.append("                    <div class=\"request-field\">\n");
+        sb.append("                        <span class=\"request-label\">Payload:</span>\n");
+        sb.append("                        <pre class=\"request-payload\" id=\"requestPayload\"></pre>\n");
         sb.append("                    </div>\n");
         sb.append("                </div>\n");
         sb.append("            </div>\n");
@@ -496,6 +518,18 @@ public class HtmlReportGenerator {
         sb.append("        document.getElementById('apicurioHeader').textContent = 'Apicurio Response (' + d.apicurioStatus + ')';\n");
         sb.append("        document.getElementById('confluentBody').textContent = d.confluentBody;\n");
         sb.append("        document.getElementById('apicurioBody').textContent = d.apicurioBody;\n");
+
+        // Request tab
+        sb.append("        document.getElementById('requestMethod').textContent = d.method;\n");
+        sb.append("        document.getElementById('requestEndpoint').textContent = d.endpoint;\n");
+        sb.append("        var reqPayload = document.getElementById('requestPayload');\n");
+        sb.append("        if (d.requestPayload && d.requestPayload.trim()) {\n");
+        sb.append("            reqPayload.textContent = d.requestPayload;\n");
+        sb.append("            reqPayload.className = 'request-payload';\n");
+        sb.append("        } else {\n");
+        sb.append("            reqPayload.textContent = '(no request body)';\n");
+        sb.append("            reqPayload.className = 'request-payload empty';\n");
+        sb.append("        }\n");
 
         // Test Code tab
         sb.append("        document.getElementById('codeClassHeader').textContent = d.testClassName + '.' + d.testMethodName;\n");

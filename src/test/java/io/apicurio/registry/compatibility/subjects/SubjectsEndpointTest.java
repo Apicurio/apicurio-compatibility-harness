@@ -172,7 +172,8 @@ class SubjectsEndpointTest extends AbstractCompatibilityTest {
             assertEquals(200, dual.apicurio().statusCode());
 
             assertCompatibility("registerNewSchema", "POST",
-                    "/subjects/{subject}/versions", dual.confluent(), dual.apicurio());
+                    "/subjects/{subject}/versions", dual.confluent(), dual.apicurio(),
+                    schemaBody(SchemaFixtures.BASIC_RECORD));
         }
 
         @Test
@@ -190,7 +191,8 @@ class SubjectsEndpointTest extends AbstractCompatibilityTest {
                     "Apicurio should return same global ID for same schema");
 
             assertCompatibility("registerSameSchema", "POST",
-                    "/subjects/{subject}/versions", second.confluent(), second.apicurio());
+                    "/subjects/{subject}/versions", second.confluent(), second.apicurio(),
+                    schemaBody(SchemaFixtures.BASIC_RECORD));
         }
 
         @Test
@@ -202,7 +204,8 @@ class SubjectsEndpointTest extends AbstractCompatibilityTest {
             assertEquals(422, dual.apicurio().statusCode());
 
             assertCompatibility("registerInvalidSchema", "POST",
-                    "/subjects/{subject}/versions", dual.confluent(), dual.apicurio());
+                    "/subjects/{subject}/versions", dual.confluent(), dual.apicurio(),
+                    schemaBody(SchemaFixtures.INVALID_SCHEMA));
         }
     }
 
@@ -253,7 +256,7 @@ class SubjectsEndpointTest extends AbstractCompatibilityTest {
         void lookupVersion() {
             registerSchema(subject(), SchemaFixtures.BASIC_RECORD);
 
-            String body = "{\"schema\": " + escapeJson(SchemaFixtures.BASIC_RECORD) + "}";
+            String body = schemaBody(SchemaFixtures.BASIC_RECORD);
 
             Response confluent = given()
                     .contentType(config.SCHEMA_REGISTRY_CONTENT_TYPE)
@@ -266,7 +269,7 @@ class SubjectsEndpointTest extends AbstractCompatibilityTest {
 
             // Apicurio returns 405 on POST version lookup
             assertCompatibility("lookupVersion", "POST",
-                    "/subjects/{subject}/versions/{version}", confluent, apicurio, false);
+                    "/subjects/{subject}/versions/{version}", confluent, apicurio, false, body);
         }
 
         @Test
@@ -274,7 +277,7 @@ class SubjectsEndpointTest extends AbstractCompatibilityTest {
         void lookupVersion_unregisteredSchema() {
             registerSchema(subject(), SchemaFixtures.BASIC_RECORD);
 
-            String body = "{\"schema\": " + escapeJson(SchemaFixtures.SIMPLE_STRING) + "}";
+            String body = schemaBody(SchemaFixtures.SIMPLE_STRING);
 
             Response confluent = given()
                     .contentType(config.SCHEMA_REGISTRY_CONTENT_TYPE)
@@ -286,7 +289,7 @@ class SubjectsEndpointTest extends AbstractCompatibilityTest {
                     .post(apicurioUrl() + "/subjects/{subject}/versions/1", subject());
 
             assertCompatibility("lookupVersion_unregisteredSchema", "POST",
-                    "/subjects/{subject}/versions/{version}", confluent, apicurio);
+                    "/subjects/{subject}/versions/{version}", confluent, apicurio, body);
         }
     }
 
@@ -395,7 +398,8 @@ class SubjectsEndpointTest extends AbstractCompatibilityTest {
 
             // Registration response may not include version field; compatibility assertion records differences
             assertCompatibility("multiVersion_thirdRegistration", "POST",
-                    "/subjects/{subject}/versions", v3.confluent(), v3.apicurio(), false);
+                    "/subjects/{subject}/versions", v3.confluent(), v3.apicurio(), false,
+                    schemaBody(SchemaFixtures.USER_V3_ADD_ANOTHER_FIELD));
         }
 
         @Test

@@ -44,7 +44,7 @@ public abstract class AbstractCompatibilityTest {
     }
 
     protected DualResponse registerSchema(String subject, String schemaJson) {
-        String body = "{\"schema\": " + escapeJson(schemaJson) + "}";
+        String body = schemaBody(schemaJson);
 
         Response confluentResp = given()
                 .contentType(TestConfiguration.SCHEMA_REGISTRY_CONTENT_TYPE)
@@ -57,6 +57,10 @@ public abstract class AbstractCompatibilityTest {
                 .post(apicurioUrl() + "/subjects/{subject}/versions", subject);
 
         return new DualResponse(confluentResp, apicurioResp);
+    }
+
+    protected String schemaBody(String schemaJson) {
+        return "{\"schema\": " + escapeJson(schemaJson) + "}";
     }
 
     protected void deleteSubjectPermanently(String subject) {
@@ -72,11 +76,21 @@ public abstract class AbstractCompatibilityTest {
 
     protected void assertCompatibility(String testName, String method, String endpoint,
             Response confluentResp, Response apicurioResp) {
-        assertCompatibility(testName, method, endpoint, confluentResp, apicurioResp, true);
+        assertCompatibility(testName, method, endpoint, confluentResp, apicurioResp, true, null);
+    }
+
+    protected void assertCompatibility(String testName, String method, String endpoint,
+            Response confluentResp, Response apicurioResp, String requestPayload) {
+        assertCompatibility(testName, method, endpoint, confluentResp, apicurioResp, true, requestPayload);
     }
 
     protected void assertCompatibility(String testName, String method, String endpoint,
             Response confluentResp, Response apicurioResp, boolean assertStatus) {
+        assertCompatibility(testName, method, endpoint, confluentResp, apicurioResp, assertStatus, null);
+    }
+
+    protected void assertCompatibility(String testName, String method, String endpoint,
+            Response confluentResp, Response apicurioResp, boolean assertStatus, String requestPayload) {
 
         String confluentStatus = String.valueOf(confluentResp.statusCode());
         String apicurioStatus = String.valueOf(apicurioResp.statusCode());
@@ -104,7 +118,7 @@ public abstract class AbstractCompatibilityTest {
         }
 
         recordOutcome(testName, method, endpoint, confluentStatus, apicurioStatus, result, details,
-                confluentResp.asString(), apicurioResp.asString());
+                confluentResp.asString(), apicurioResp.asString(), requestPayload);
     }
 
     protected void assertErrorParity(String testName, Response confluent, Response apicurio,
@@ -130,13 +144,13 @@ public abstract class AbstractCompatibilityTest {
 
         recordOutcome(testName, "VARIES", "error-code-parity",
                 String.valueOf(confluent.statusCode()), String.valueOf(apicurio.statusCode()),
-                result, details, confluent.asString(), apicurio.asString());
+                result, details, confluent.asString(), apicurio.asString(), null);
     }
 
     private void recordOutcome(String testName, String method, String endpoint,
             String confluentStatus, String apicurioStatus,
             CompatibilityTestResult result, String details,
-            String confluentBody, String apicurioBody) {
+            String confluentBody, String apicurioBody, String requestPayload) {
         String[] classAndMethod = inferTestClassAndMethod();
         TestResultCollector.getInstance().record(TestOutcome.builder()
                 .testName(testName)
@@ -148,6 +162,7 @@ public abstract class AbstractCompatibilityTest {
                 .details(details)
                 .confluentBody(confluentBody)
                 .apicurioBody(apicurioBody)
+                .requestPayload(requestPayload)
                 .testClassName(classAndMethod[0])
                 .testMethodName(classAndMethod[1])
                 .build());

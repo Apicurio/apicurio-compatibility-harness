@@ -20,6 +20,7 @@ public class TestOutcome {
     private final String openApiOperation;
     private final String confluentDocUrl;
     private final String apicurioImplHint;
+    private final String requestPayload;
 
     private TestOutcome(Builder builder) {
         this.testName = builder.testName;
@@ -37,6 +38,7 @@ public class TestOutcome {
         this.openApiOperation = builder.openApiOperation;
         this.confluentDocUrl = builder.confluentDocUrl;
         this.apicurioImplHint = builder.apicurioImplHint;
+        this.requestPayload = builder.requestPayload;
     }
 
     public String getTestName() { return testName; }
@@ -54,6 +56,7 @@ public class TestOutcome {
     public String getOpenApiOperation() { return openApiOperation; }
     public String getConfluentDocUrl() { return confluentDocUrl; }
     public String getApicurioImplHint() { return apicurioImplHint; }
+    public String getRequestPayload() { return requestPayload; }
 
     public static Builder builder() {
         return new Builder();
@@ -75,6 +78,7 @@ public class TestOutcome {
         private String openApiOperation;
         private String confluentDocUrl;
         private String apicurioImplHint;
+        private String requestPayload;
 
         public Builder testName(String testName) { this.testName = testName; return this; }
         public Builder endpoint(String endpoint) { this.endpoint = endpoint; return this; }
@@ -91,6 +95,7 @@ public class TestOutcome {
         public Builder openApiOperation(String openApiOperation) { this.openApiOperation = openApiOperation; return this; }
         public Builder confluentDocUrl(String confluentDocUrl) { this.confluentDocUrl = confluentDocUrl; return this; }
         public Builder apicurioImplHint(String apicurioImplHint) { this.apicurioImplHint = apicurioImplHint; return this; }
+        public Builder requestPayload(String requestPayload) { this.requestPayload = requestPayload; return this; }
 
         public TestOutcome build() { return new TestOutcome(this); }
     }
