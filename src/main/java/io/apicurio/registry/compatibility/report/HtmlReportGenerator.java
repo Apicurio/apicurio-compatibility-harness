@@ -166,6 +166,14 @@ public class HtmlReportGenerator {
         sb.append("                        line-height: 1; }\n");
         sb.append("        .drawer-close:hover { color: #333; }\n");
 
+        // Drawer details subtitle
+        sb.append("        .drawer-details { padding: 0.5rem 1.25rem; background: #fafafa;\n");
+        sb.append("                          font-size: 0.85rem; color: #555;\n");
+        sb.append("                          border-bottom: 1px solid #e0e0e0;\n");
+        sb.append("                          font-family: 'SF Mono', 'Consolas', monospace;\n");
+        sb.append("                          word-break: break-word; }\n");
+        sb.append("        .drawer-details.fail { color: #c62828; background: #fbe9e7; }\n");
+
         // Drawer tabs
         sb.append("        .drawer-tabs { display: flex; border-bottom: 1px solid #e0e0e0;\n");
         sb.append("                       padding: 0 1rem; }\n");
@@ -400,6 +408,9 @@ public class HtmlReportGenerator {
         sb.append("            <button class=\"drawer-close\" onclick=\"closeDrawer()\">&times;</button>\n");
         sb.append("        </div>\n");
 
+        // Details subtitle (visible across all tabs)
+        sb.append("        <div class=\"drawer-details\" id=\"drawerDetails\"></div>\n");
+
         // Tabs
         sb.append("        <div class=\"drawer-tabs\">\n");
         sb.append("            <button class=\"tab-btn active\" onclick=\"switchTab('responses')\">Responses</button>\n");
@@ -514,6 +525,9 @@ public class HtmlReportGenerator {
         sb.append("        _currentIdx = idx;\n");
         sb.append("        var d = TEST_DATA[idx];\n");
         sb.append("        document.getElementById('drawerTitle').textContent = d.testName;\n");
+        sb.append("        var detailsEl = document.getElementById('drawerDetails');\n");
+        sb.append("        detailsEl.textContent = d.details;\n");
+        sb.append("        detailsEl.className = d.result === 'FAIL' ? 'drawer-details fail' : 'drawer-details';\n");
         sb.append("        document.getElementById('confluentHeader').textContent = 'Confluent Response (' + d.confluentStatus + ')';\n");
         sb.append("        document.getElementById('apicurioHeader').textContent = 'Apicurio Response (' + d.apicurioStatus + ')';\n");
         sb.append("        document.getElementById('confluentBody').textContent = d.confluentBody;\n");
