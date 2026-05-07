@@ -162,11 +162,14 @@ apicurio-compatibility-harness/
     test/
       java/io/apicurio/registry/compatibility/
         shared/                    # AbstractCompatibilityTest, SchemaFixtures, CompatibilityReportExtension
+        staticanalysis/            # OpenAPI spec diff + example validation (Phase A: offline, Phase B: needs containers)
         subjects/                  # /subjects endpoint tests
         schemas/                   # /schemas endpoint tests
         compatibility/             # /compatibility endpoint tests
         config/                    # /config endpoint tests
         mode/                      # /mode endpoint tests
+      resources/
+        openapi/                  # Confluent v8 OpenAPI spec (confluent-sr-v8.yaml)
 ```
 
 ### Container Services (podman-compose.yml)
