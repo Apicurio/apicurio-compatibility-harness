@@ -26,7 +26,13 @@ jobs:
     runs-on: ubuntu-24.04
     strategy:
       matrix:
-        api_level: [v7, v8]
+        include:
+          - api_level: v7
+            confluent_image: docker.io/confluentinc/cp-schema-registry:7.8.0
+            confluent_version: "7.8.0"
+          - api_level: v8
+            confluent_image: docker.io/confluentinc/cp-schema-registry:8.1.3
+            confluent_version: "8.1.3"
     steps:
       - name: Check API level filter
         id: filter
@@ -55,11 +61,8 @@ jobs:
       - name: Start test infrastructure
         if: steps.filter.outputs.skip != 'true'
         env:
-          CONFLUENT_IMAGE: ${{ github.event.inputs.confluent_image || '' }}
+          CONFLUENT_IMAGE: ${{ github.event.inputs.confluent_image || matrix.confluent_image }}
         run: |
-          if [ -n "$CONFLUENT_IMAGE" ]; then
-            export CONFLUENT_IMAGE
-          fi
           podman-compose up -d
           sleep 5
           podman ps --format '{{.Names}} {{.Status}}'
@@ -79,11 +82,11 @@ jobs:
       - name: Run compatibility tests (${{ matrix.api_level }})
         if: steps.filter.outputs.skip != 'true'
         run: |
-          CONFLUENT_VERSION=$(grep -oP 'cp-schema-registry:\K[0-9]+\.[0-9]+\.[0-9]+' podman-compose.yml)
           APICURIO_IMAGE=$(podman inspect compat-apicurio-sr --format '{{.Image}}' 2>/dev/null || echo "unknown")
           echo "Apicurio image: ${APICURIO_IMAGE}"
+          echo "Confluent version: ${{ matrix.confluent_version }}"
           echo "API level: ${{ matrix.api_level }}"
-          mvn clean test -B -Dconfluent.registry.version="$CONFLUENT_VERSION" -Dapi.level=${{ matrix.api_level }}
+          mvn clean test -B -Dconfluent.registry.version="${{ matrix.confluent_version }}" -Dapi.level=${{ matrix.api_level }}
         timeout-minutes: 15
 
       - name: Collect container logs
