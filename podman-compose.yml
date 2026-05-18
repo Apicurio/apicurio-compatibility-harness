@@ -26,7 +26,7 @@ services:
       start_period: 15s
 
   confluent-sr:
-    image: docker.io/confluentinc/cp-schema-registry:7.8.0
+    image: ${CONFLUENT_IMAGE:-docker.io/confluentinc/cp-schema-registry:7.8.0}
     container_name: compat-confluent-sr
     depends_on:
       kafka:
@@ -46,7 +46,7 @@ services:
       start_period: 30s
 
   apicurio-sr:
-    image: quay.io/apicurio/apicurio-registry:latest-snapshot
+    image: ${APICURIO_IMAGE:-quay.io/apicurio/apicurio-registry:latest-snapshot}
     container_name: compat-apicurio-sr
     depends_on:
       kafka:

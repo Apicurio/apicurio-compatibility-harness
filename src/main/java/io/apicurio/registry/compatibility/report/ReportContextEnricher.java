@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import io.apicurio.registry.compatibility.config.TestConfiguration;
 import io.apicurio.registry.compatibility.model.TestOutcome;
 
 /**
@@ -22,7 +23,7 @@ public class ReportContextEnricher {
             "https://docs.confluent.io/platform/current/schema-registry/develop/api.html";
 
     private static final String APICURIO_GITHUB_BASE =
-            "https://github.com/Apicurio/apicurio-registry/blob/main/app/src/main/java/io/apicurio/registry/ccompat/rest/v8";
+            "https://github.com/Apicurio/apicurio-registry/blob/main/app/src/main/java/io/apicurio/registry/ccompat/rest/" + TestConfiguration.getApiLevel();
 
     /**
      * Static metadata for a single Confluent v8 API endpoint.

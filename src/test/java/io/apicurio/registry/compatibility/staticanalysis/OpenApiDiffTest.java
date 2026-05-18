@@ -13,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 
 import io.apicurio.registry.compatibility.collector.TestResultCollector;
+import io.apicurio.registry.compatibility.config.TestConfiguration;
 import io.apicurio.registry.compatibility.model.CompatibilityTestResult;
 import io.apicurio.registry.compatibility.model.TestOutcome;
 import io.apicurio.registry.compatibility.shared.CompatibilityReportExtension;
@@ -20,6 +21,8 @@ import io.apicurio.registry.compatibility.shared.CompatibilityReportExtension;
 @DisplayName("Static OpenAPI Spec Diff")
 @ExtendWith(CompatibilityReportExtension.class)
 class OpenApiDiffTest {
+
+    private static final TestConfiguration config = new TestConfiguration();
 
     @TempDir
     Path tempDir;
@@ -66,7 +69,7 @@ class OpenApiDiffTest {
         }
 
         // 3. Live fetch from running Apicurio container
-        return fetchSpecToTemp("http://localhost:8082/apis/ccompat/v8/openapi", "apicurio-live");
+        return fetchSpecToTemp(config.getApicurioRegistryUrl() + "/openapi", "apicurio-live");
     }
 
     private Path fetchSpecToTemp(String url, String label) {

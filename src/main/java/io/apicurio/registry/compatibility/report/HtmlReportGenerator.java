@@ -10,6 +10,7 @@ import java.util.List;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.apicurio.registry.compatibility.collector.TestResultCollector;
+import io.apicurio.registry.compatibility.config.TestConfiguration;
 import io.apicurio.registry.compatibility.model.TestOutcome;
 
 public class HtmlReportGenerator {
@@ -17,11 +18,19 @@ public class HtmlReportGenerator {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String CONFLUENT_VERSION =
             System.getProperty("confluent.registry.version", "7.8.0");
+    private static final String API_LEVEL = TestConfiguration.getApiLevel();
 
     private final TestResultCollector collector;
+    private final ContainerVersionDetector.ContainerVersions containerVersions;
 
     public HtmlReportGenerator(TestResultCollector collector) {
+        this(collector, null);
+    }
+
+    public HtmlReportGenerator(TestResultCollector collector,
+            ContainerVersionDetector.ContainerVersions containerVersions) {
         this.collector = collector;
+        this.containerVersions = containerVersions;
     }
 
     public void generate(Path outputPath) throws IOException {
@@ -41,17 +50,24 @@ public class HtmlReportGenerator {
         sb.append("<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n");
         sb.append("    <meta charset=\"UTF-8\">\n");
         sb.append("    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n");
-        sb.append("    <title>Apicurio Registry - Confluent v8 API Compatibility Report</title>\n");
+        sb.append("    <title>Apicurio Registry - Confluent ")
+                .append(API_LEVEL)
+                .append(" API Compatibility Report</title>\n");
         appendCss(sb);
         sb.append("</head>\n<body>\n");
 
         // Header
-        sb.append("    <h1>Apicurio Registry - Confluent v8 API Compatibility Report</h1>\n");
+        sb.append("    <h1>Apicurio Registry - Confluent ")
+                .append(API_LEVEL)
+                .append(" API Compatibility Report</h1>\n");
         sb.append("    <p class=\"meta\">Generated: ")
                 .append(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
                 .append(" &middot; Confluent Schema Registry: v")
                 .append(escapeHtml(CONFLUENT_VERSION))
                 .append("</p>\n");
+
+        // Container versions
+        appendContainerVersionBar(sb);
 
         // Summary cards
         appendSummarySection(sb);
@@ -86,7 +102,25 @@ public class HtmlReportGenerator {
         sb.append("        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;\n");
         sb.append("               background: #f5f5f5; color: #333; padding: 2rem; }\n");
         sb.append("        h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }\n");
-        sb.append("        .meta { color: #666; font-size: 0.85rem; margin-bottom: 1rem; }\n");
+        sb.append("        .meta { color: #666; font-size: 0.85rem; margin-bottom: 0.5rem; }\n");
+
+        // Version bar
+        sb.append("        .version-bar { display: flex; gap: 1.5rem; flex-wrap: wrap;\n");
+        sb.append("                       margin-bottom: 1rem; padding: 0.6rem 1rem;\n");
+        sb.append("                       background: white; border-radius: 6px;\n");
+        sb.append("                       box-shadow: 0 1px 3px rgba(0,0,0,0.1);\n");
+        sb.append("                       font-size: 0.85rem; }\n");
+        sb.append("        .version-item { display: flex; align-items: center; gap: 0.4rem; }\n");
+        sb.append("        .version-label { font-weight: 600; color: #37474f; }\n");
+        sb.append("        .version-value { color: #333; }\n");
+        sb.append("        .version-unknown { color: #999; font-style: italic; }\n");
+        sb.append("        .version-digest { font-family: 'SF Mono', 'Consolas', monospace;\n");
+        sb.append("                          font-size: 0.75rem; color: #888;\n");
+        sb.append("                          background: #f5f5f5; padding: 0.15rem 0.4rem;\n");
+        sb.append("                          border-radius: 3px; }\n");
+        sb.append("        .version-link { color: #1565c0; text-decoration: none;\n");
+        sb.append("                        font-size: 0.8rem; font-weight: 500; }\n");
+        sb.append("        .version-link:hover { text-decoration: underline; }\n");
 
         // Toolbar
         sb.append("        .toolbar { display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1rem; }\n");
@@ -262,6 +296,43 @@ public class HtmlReportGenerator {
         sb.append("        .triage-bar input[type=\"text\"] { flex: 1; min-width: 100px; }\n");
 
         sb.append("    </style>\n");
+    }
+
+    // ---------------------------------------------------------------
+    // Container version bar
+    // ---------------------------------------------------------------
+
+    private void appendContainerVersionBar(StringBuilder sb) {
+        if (containerVersions == null) return;
+
+        sb.append("    <div class=\"version-bar\">\n");
+        appendVersionItem(sb, "Apicurio Registry:", containerVersions.apicurio(),
+                null, containerVersions.apicurio() != null ? containerVersions.apicurio().registryUrl() : null);
+        appendVersionItem(sb, "Confluent SR:", containerVersions.confluent(),
+                "v" + CONFLUENT_VERSION, null);
+        sb.append("    </div>\n");
+    }
+
+    private void appendVersionItem(StringBuilder sb, String label,
+            ContainerVersionDetector.ImageInfo info, String fallbackText, String linkUrl) {
+        sb.append("        <div class=\"version-item\"><span class=\"version-label\">").append(label).append("</span> ");
+        boolean detected = info != null && info.detected();
+        if (detected) {
+            sb.append("<span class=\"version-value\">").append(escapeHtml(info.displayVersion())).append("</span>");
+            if (!info.shortDigest().isEmpty()) {
+                sb.append(" <code class=\"version-digest\">sha256:").append(escapeHtml(info.shortDigest())).append("...</code>");
+            }
+            if (linkUrl != null && !linkUrl.isEmpty()) {
+                sb.append(" <a href=\"").append(escapeHtml(linkUrl))
+                        .append("\" target=\"_blank\" rel=\"noopener\" class=\"version-link\">View on Quay</a>");
+            }
+        } else if (fallbackText != null) {
+            sb.append("<span class=\"version-value\">").append(escapeHtml(fallbackText)).append("</span>");
+        } else {
+            sb.append("<span class=\"version-value version-unknown\">")
+                    .append(escapeHtml(info != null ? info.fullImage() : "unknown")).append("</span>");
+        }
+        sb.append("</div>\n");
     }
 
     // ---------------------------------------------------------------
@@ -583,7 +654,7 @@ public class HtmlReportGenerator {
         sb.append("                implLink.href = d.apicurioImplHint;\n");
         sb.append("                implLink.style.display = '';\n");
         sb.append("            } else {\n");
-        sb.append("                implLink.href = 'https://github.com/Apicurio/apicurio-registry/blob/main/app/src/main/java/io/apicurio/registry/ccompat/rest/v8/' + d.apicurioImplHint;\n");
+        sb.append("                implLink.href = 'https://github.com/Apicurio/apicurio-registry/blob/main/app/src/main/java/io/apicurio/registry/ccompat/rest/" + API_LEVEL + "/' + d.apicurioImplHint;\n");
         sb.append("                implLink.style.display = '';\n");
         sb.append("            }\n");
         sb.append("        } else {\n");

@@ -6,11 +6,28 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      confluent_image:
+        description: 'Confluent Schema Registry image override (leave empty for default)'
+        required: false
+        default: ''
+      api_level:
+        description: 'Run only this API level (leave empty to run both v7 and v8)'
+        required: false
+        default: ''
+        type: choice
+        options:
+          - ''
+          - 'v7'
+          - 'v8'
 
 jobs:
   compatibility:
+    if: github.event.inputs.api_level == '' || github.event.inputs.api_level == matrix.api_level
     runs-on: ubuntu-24.04
-
+    strategy:
+      matrix:
+        api_level: [v7, v8]
     steps:
       - uses: actions/checkout@v4
 
@@ -25,7 +42,12 @@ jobs:
         run: pip3 install podman-compose==1.2.0
 
       - name: Start test infrastructure
+        env:
+          CONFLUENT_IMAGE: ${{ github.event.inputs.confluent_image || '' }}
         run: |
+          if [ -n "$CONFLUENT_IMAGE" ]; then
+            export CONFLUENT_IMAGE
+          fi
           podman-compose up -d
           sleep 5
           podman ps --format '{{.Names}} {{.Status}}'
@@ -41,10 +63,13 @@ jobs:
         run: ./wait-for-ready.sh 180
         timeout-minutes: 5
 
-      - name: Run compatibility tests
+      - name: Run compatibility tests (${{ matrix.api_level }})
         run: |
           CONFLUENT_VERSION=$(grep -oP 'cp-schema-registry:\K[0-9]+\.[0-9]+\.[0-9]+' podman-compose.yml)
-          mvn clean test -B -Dconfluent.registry.version="$CONFLUENT_VERSION"
+          APICURIO_IMAGE=$(podman inspect compat-apicurio-sr --format '{{.Image}}' 2>/dev/null || echo "unknown")
+          echo "Apicurio image: ${APICURIO_IMAGE}"
+          echo "API level: ${{ matrix.api_level }}"
+          mvn clean test -B -Dconfluent.registry.version="$CONFLUENT_VERSION" -Dapi.level=${{ matrix.api_level }}
         timeout-minutes: 15
 
       - name: Collect container logs
@@ -55,7 +80,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: compatibility-report
+          name: compatibility-report-${{ matrix.api_level }}
           path: target/compatibility-report.html
           retention-days: 30
 
@@ -64,8 +89,11 @@ jobs:
         run: podman-compose down -v || true
 
   deploy-pages:
-    needs: compatibility
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [compatibility]
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      always() &&
+      needs.compatibility.result == 'success'
     runs-on: ubuntu-24.04
     permissions:
       pages: write
@@ -74,14 +102,58 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Download compatibility report
+      - name: Download v7 report
         uses: actions/download-artifact@v4
         with:
-          name: compatibility-report
-          path: report-output
+          name: compatibility-report-v7
+          path: report-output/v7
+        continue-on-error: true
 
-      - name: Rename to index.html
-        run: mv report-output/compatibility-report.html report-output/index.html
+      - name: Download v8 report
+        uses: actions/download-artifact@v4
+        with:
+          name: compatibility-report-v8
+          path: report-output/v8
+        continue-on-error: true
+
+      - name: Build Pages site
+        run: |
+          # Rename individual reports to index.html
+          if [ -f report-output/v7/compatibility-report.html ]; then
+            mv report-output/v7/compatibility-report.html report-output/v7/index.html
+          fi
+          if [ -f report-output/v8/compatibility-report.html ]; then
+            mv report-output/v8/compatibility-report.html report-output/v8/index.html
+          fi
+
+          # Create landing page linking to both reports
+          cat > report-output/index.html << 'INDEX'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Apicurio Registry - Compatibility Reports</title>
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 640px; margin: 3rem auto; padding: 0 1rem; }
+              h1 { color: #1a1a2e; }
+              ul { list-style: none; padding: 0; }
+              li { margin: 1rem 0; }
+              a { display: block; padding: 1rem 1.5rem; background: #f0f4ff; border-radius: 8px; text-decoration: none; color: #2b3a67; font-weight: 600; font-size: 1.1rem; transition: background 0.2s; }
+              a:hover { background: #dce4f8; }
+              .meta { color: #666; margin-top: 2rem; }
+            </style>
+          </head>
+          <body>
+            <h1>Apicurio Registry - Compatibility Reports</h1>
+            <ul>
+              <li><a href="v7/">Confluent v7 API Compatibility Report</a></li>
+              <li><a href="v8/">Confluent v8 API Compatibility Report</a></li>
+            </ul>
+            <p class="meta">Published via GitHub Actions from the main branch.</p>
+          </body>
+          </html>
+          INDEX
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
@@ -97,43 +169,78 @@ jobs:
 
   publish-report:
     needs: [compatibility, deploy-pages]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      always() &&
+      needs.compatibility.result == 'success'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
       issues: write
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Download compatibility report
+      - name: Download v7 report
         uses: actions/download-artifact@v4
         with:
-          name: compatibility-report
-          path: report-output
+          name: compatibility-report-v7
+          path: report-v7
+        continue-on-error: true
 
-      - name: Extract report summary
+      - name: Download v8 report
+        uses: actions/download-artifact@v4
+        with:
+          name: compatibility-report-v8
+          path: report-v8
+        continue-on-error: true
+
+      - name: Extract report summaries
         id: summary
         run: |
-          REPORT="report-output/compatibility-report.html"
+          extract_counts() {
+            local REPORT="$1"
+            if [ ! -f "$REPORT" ]; then
+              echo "? ? ? ? ? ? unknown"
+              return
+            fi
+            TOTAL=$(grep -oP '<div class="number[ "]*>[0-9]+</div><div class="label">Total' "$REPORT" | grep -oP '>[0-9]+<' | tr -d '><' | head -1 || echo "?")
+            PASS=$(grep -oP '<div class="number pass">[0-9]+</div><div class="label">Pass' "$REPORT" | grep -oP '>[0-9]+<' | tr -d '><' | head -1 || echo "?")
+            FAIL=$(grep -oP '<div class="number fail">[0-9]+</div><div class="label">Fail' "$REPORT" | grep -oP '>[0-9]+<' | tr -d '><' | head -1 || echo "?")
+            SKIP=$(grep -oP '<div class="number skipped">[0-9]+</div><div class="label">Skipped' "$REPORT" | grep -oP '>[0-9]+<' | tr -d '><' | head -1 || echo "?")
+            KNOWN=$(grep -oP '<div class="number known">[0-9]+</div><div class="label">Known Incompat' "$REPORT" | grep -oP '>[0-9]+<' | tr -d '><' | head -1 || echo "?")
+            ERR=$(grep -oP '<div class="number error">[0-9]+</div><div class="label">Error' "$REPORT" | grep -oP '>[0-9]+<' | tr -d '><' | head -1 || echo "?")
+            VERSION=$(grep -oP 'Confluent Schema Registry: v\K[0-9.]+' "$REPORT" | head -1 || echo "unknown")
+            echo "$TOTAL $PASS $FAIL $SKIP $KNOWN $ERR $VERSION"
+          }
 
-          # Extract counts from summary cards (HTML structure: <div class="number CLASS">N</div><div class="label">LABEL</div>)
-          TOTAL=$(grep -oP '<div class="number[ "]*>[0-9]+</div><div class="label">Total' "$REPORT" | grep -oP '>[0-9]+<' | tr -d '><' | head -1 || echo "?")
-          PASS=$(grep -oP '<div class="number pass">[0-9]+</div><div class="label">Pass' "$REPORT" | grep -oP '>[0-9]+<' | tr -d '><' | head -1 || echo "?")
-          FAIL=$(grep -oP '<div class="number fail">[0-9]+</div><div class="label">Fail' "$REPORT" | grep -oP '>[0-9]+<' | tr -d '><' | head -1 || echo "?")
-          SKIP=$(grep -oP '<div class="number skipped">[0-9]+</div><div class="label">Skipped' "$REPORT" | grep -oP '>[0-9]+<' | tr -d '><' | head -1 || echo "?")
-          KNOWN=$(grep -oP '<div class="number known">[0-9]+</div><div class="label">Known Incompat' "$REPORT" | grep -oP '>[0-9]+<' | tr -d '><' | head -1 || echo "?")
-          ERR=$(grep -oP '<div class="number error">[0-9]+</div><div class="label">Error' "$REPORT" | grep -oP '>[0-9]+<' | tr -d '><' | head -1 || echo "?")
-          VERSION=$(grep -oP 'Confluent Schema Registry: v\K[0-9.]+' "$REPORT" | head -1 || echo "unknown")
+          read V7_TOTAL V7_PASS V7_FAIL V7_SKIP V7_KNOWN V7_ERR V7_VERSION <<< "$(extract_counts report-v7/compatibility-report.html)"
+          read V8_TOTAL V8_PASS V8_FAIL V8_SKIP V8_KNOWN V8_ERR V8_VERSION <<< "$(extract_counts report-v8/compatibility-report.html)"
 
-          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
-          echo "pass=$PASS" >> "$GITHUB_OUTPUT"
-          echo "fail=$FAIL" >> "$GITHUB_OUTPUT"
-          echo "skip=$SKIP" >> "$GITHUB_OUTPUT"
-          echo "known=$KNOWN" >> "$GITHUB_OUTPUT"
-          echo "error=$ERR" >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          # Apicurio image info from v8 report (both use the same image)
+          APICURIO_TAG="unknown"
+          APICURIO_DIGEST=""
+          if [ -f report-v8/compatibility-report.html ]; then
+            APICURIO_TAG=$(grep -oP 'Apicurio Registry:</span>\s*<span class="version-value">\K[^<]+' report-v8/compatibility-report.html | head -1 || echo "unknown")
+            APICURIO_DIGEST=$(grep -oP 'version-digest">sha256:\K[a-f0-9]+' report-v8/compatibility-report.html | head -1 || echo "")
+          fi
 
-          if [ "$FAIL" = "0" ] && [ "$ERR" = "0" ]; then
+          {
+            echo "v7_total=$V7_TOTAL"
+            echo "v7_pass=$V7_PASS"
+            echo "v7_fail=$V7_FAIL"
+            echo "v7_skip=$V7_SKIP"
+            echo "v7_known=$V7_KNOWN"
+            echo "v7_err=$V7_ERR"
+            echo "v8_total=$V8_TOTAL"
+            echo "v8_pass=$V8_PASS"
+            echo "v8_fail=$V8_FAIL"
+            echo "v8_skip=$V8_SKIP"
+            echo "v8_known=$V8_KNOWN"
+            echo "v8_err=$V8_ERR"
+            echo "version=$V8_VERSION"
+            echo "apicurio_tag=$APICURIO_TAG"
+            echo "apicurio_digest=$APICURIO_DIGEST"
+          } >> "$GITHUB_OUTPUT"
+
+          if [ "$V7_FAIL" = "0" ] && [ "$V7_ERR" = "0" ] && [ "$V8_FAIL" = "0" ] && [ "$V8_ERR" = "0" ]; then
             echo "status=passed" >> "$GITHUB_OUTPUT"
           else
             echo "status=failed" >> "$GITHUB_OUTPUT"
@@ -144,7 +251,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Look for the pinned report issue
           ISSUE_NUMBER=$(gh issue list --state open --search "Compatibility Test Report Dashboard" --json number --jq '.[0].number' || true)
 
           if [ -z "$ISSUE_NUMBER" ]; then
@@ -162,12 +268,8 @@ jobs:
         run: |
           STATUS="${{ steps.summary.outputs.status }}"
           VERSION="${{ steps.summary.outputs.version }}"
-          TOTAL="${{ steps.summary.outputs.total }}"
-          PASS="${{ steps.summary.outputs.pass }}"
-          FAIL="${{ steps.summary.outputs.fail }}"
-          SKIP="${{ steps.summary.outputs.skip }}"
-          KNOWN="${{ steps.summary.outputs.known }}"
-          ERR="${{ steps.summary.outputs.error }}"
+          APICURIO_TAG="${{ steps.summary.outputs.apicurio_tag }}"
+          APICURIO_DIGEST="${{ steps.summary.outputs.apicurio_digest }}"
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           RUN_DATE=$(date -u '+%Y-%m-%d %H:%M UTC')
 
@@ -177,22 +279,41 @@ jobs:
             ICON=":x:"
           fi
 
+          APICURIO_LINE="**Apicurio Registry:** \`${APICURIO_TAG}\`"
+          if [ -n "$APICURIO_DIGEST" ]; then
+            APICURIO_LINE="$APICURIO_LINE (sha256: ${APICURIO_DIGEST}...)"
+          fi
+
           gh issue comment "${{ steps.issue.outputs.number }}" --body "$(cat <<BODY
           ## $ICON Compatibility Report — $RUN_DATE
 
           **Commit:** [\`${SHORT_SHA}\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
           **Confluent SR:** v${VERSION}
+          ${APICURIO_LINE}
+
+          ### v7 API
 
           | | Count |
           |---|---|
-          | Total | ${TOTAL} |
-          | Pass | ${PASS} |
-          | Fail | ${FAIL} |
-          | Skipped (Known Gaps) | ${SKIP} |
-          | Known Incompatibilities | ${KNOWN} |
-          | Errors | ${ERR} |
+          | Total | ${{ steps.summary.outputs.v7_total }} |
+          | Pass | ${{ steps.summary.outputs.v7_pass }} |
+          | Fail | ${{ steps.summary.outputs.v7_fail }} |
+          | Skipped (Known Gaps) | ${{ steps.summary.outputs.v7_skip }} |
+          | Known Incompatibilities | ${{ steps.summary.outputs.v7_known }} |
+          | Errors | ${{ steps.summary.outputs.v7_err }} |
 
-          **Full HTML report:** [View in browser](https://apicurio.github.io/apicurio-compatibility-harness/) | [Download artifact](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) (compatibility-report)
+          ### v8 API
+
+          | | Count |
+          |---|---|
+          | Total | ${{ steps.summary.outputs.v8_total }} |
+          | Pass | ${{ steps.summary.outputs.v8_pass }} |
+          | Fail | ${{ steps.summary.outputs.v8_fail }} |
+          | Skipped (Known Gaps) | ${{ steps.summary.outputs.v8_skip }} |
+          | Known Incompatibilities | ${{ steps.summary.outputs.v8_known }} |
+          | Errors | ${{ steps.summary.outputs.v8_err }} |
+
+          **Full HTML reports:** [View in browser](https://apicurio.github.io/apicurio-compatibility-harness/) | [Download artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
 
           ---
           BODY

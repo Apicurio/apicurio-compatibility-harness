@@ -8,6 +8,7 @@ import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 
 import io.apicurio.registry.compatibility.collector.TestResultCollector;
+import io.apicurio.registry.compatibility.report.ContainerVersionDetector;
 import io.apicurio.registry.compatibility.report.HtmlReportGenerator;
 import io.apicurio.registry.compatibility.report.ReportContextEnricher;
 
@@ -30,7 +31,12 @@ public class CompatibilityReportExtension implements BeforeAllCallback, AfterAll
                     TestResultCollector collector = TestResultCollector.getInstance();
                     ReportContextEnricher enricher = new ReportContextEnricher();
                     enricher.enrich(collector.getOutcomesForEnrichment());
-                    HtmlReportGenerator generator = new HtmlReportGenerator(collector);
+
+                    ContainerVersionDetector versionDetector = new ContainerVersionDetector();
+                    ContainerVersionDetector.ContainerVersions versions = versionDetector.detect();
+                    logVersionInfo(versions);
+
+                    HtmlReportGenerator generator = new HtmlReportGenerator(collector, versions);
                     generator.generate(Path.of(REPORT_PATH));
                     System.out.println("Compatibility report written to " + REPORT_PATH
                             + " (" + collector.getTotalCount() + " results)");
@@ -45,5 +51,19 @@ public class CompatibilityReportExtension implements BeforeAllCallback, AfterAll
     @Override
     public void afterAll(ExtensionContext context) {
         // Report generation deferred to shutdown hook registered in beforeAll
+    }
+
+    private void logVersionInfo(ContainerVersionDetector.ContainerVersions versions) {
+        if (versions == null) return;
+        logImage("Apicurio Registry image", versions.apicurio());
+        logImage("Confluent SR image", versions.confluent());
+    }
+
+    private void logImage(String label, ContainerVersionDetector.ImageInfo info) {
+        if (info == null) return;
+        StringBuilder msg = new StringBuilder(label).append(": ").append(info.fullImage());
+        if (info.tag() != null) msg.append(" (tag: ").append(info.tag()).append(")");
+        if (!info.shortDigest().isEmpty()) msg.append(" (sha256:").append(info.shortDigest()).append("...)");
+        System.out.println(msg);
     }
 }
